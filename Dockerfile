@@ -28,6 +28,8 @@ COPY --from=build --chown=vapor:vapor /staging /app
 USER vapor:vapor
 EXPOSE 8080
 
-# HOST and PORT are read in configure.swift; cloud hosts inject PORT.
+# No --hostname/--port here on purpose: those flags override whatever
+# configure.swift read from the environment, and cloud hosts inject PORT and
+# route to it. Leaving them out lets the env win.
 ENTRYPOINT ["./App"]
-CMD ["serve", "--env", "production", "--hostname", "0.0.0.0", "--port", "8080"]
+CMD ["serve", "--env", "production"]
