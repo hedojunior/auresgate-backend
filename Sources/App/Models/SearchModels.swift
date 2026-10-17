@@ -19,6 +19,14 @@ struct Pet: Content, Sendable {
     /// distinguishes one animal from another during ranging.
     var major: Int
     var minor: Int
+    /// The animal's photo, JPEG in base64, already downscaled by the app.
+    ///
+    /// Stored inline with the search rather than as an uploaded file: the
+    /// server keeps no file storage, and the image is small by construction
+    /// (~20 KB). It is relayed to every participant, because a face is what
+    /// lets someone tell the right animal from another loose dog once the
+    /// signal says "close by".
+    var photoBase64: String?
 }
 
 struct Coordinate: Content, Sendable {
