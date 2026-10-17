@@ -1,0 +1,17 @@
+# Artefatos de build do SwiftPM — milhares de arquivos, centenas de MB.
+.build/
+.swiftpm/
+Packages/
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+
+# macOS
+.DS_Store
+
+# Credenciais — a chave da API nunca deve ir para o repositório.
+.env
+*.pem
