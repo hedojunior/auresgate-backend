@@ -6,6 +6,14 @@ public func configure(_ app: Application) async throws {
     app.http.server.configuration.hostname = Environment.get("HOST") ?? "0.0.0.0"
     app.http.server.configuration.port = Environment.get("PORT").flatMap(Int.init) ?? 8080
 
+    // Vapor collects at most 16 KB of request body by default, which a search
+    // cannot fit: it carries the animal's photo inline, as base64, and base64
+    // inflates the JPEG by a third. 512 KB leaves generous room for the photo
+    // the app sends (~20 to 60 KB) without turning this endpoint into a file
+    // upload — the server keeps no storage, so there is nothing to gain from
+    // accepting more.
+    app.routes.defaultMaxBodySize = "512kb"
+
     // Dates travel as ISO 8601 with fractional seconds, matching what the iOS
     // app already writes to its passive log. Keeping one format across both
     // sides avoids a class of parsing bugs that only show up in the field.
