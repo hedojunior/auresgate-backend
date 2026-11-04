@@ -1,28 +1,12 @@
 import Foundation
 import Vapor
 
-/// In-memory store for active searches.
-///
-/// An actor rather than a lock: every mutation goes through one executor, so
-/// two devices reporting detections at the same instant cannot interleave.
-///
-/// Deliberately not persisted. The prototype demonstrates the collaborative
-/// flow, and a restart losing state is acceptable for that purpose; swapping
-/// this type for a Fluent-backed repository would not change the controllers.
 actor SearchStore {
-
-    /// A participant is counted as present while a heartbeat arrived within
-    /// this window. Without it, someone who closed the app would inflate the
-    /// "X people helping" figure indefinitely.
     private static let participantTimeout: TimeInterval = 90
 
-    /// Searches older than this are closed automatically, so a forgotten
-    /// prototype session does not keep notifying people.
     private static let maxSearchAge: TimeInterval = 60 * 60 * 6
 
     private var searches: [UUID: Search] = [:]
-
-    // MARK: - Creating
 
     func startSearch(_ request: StartSearchRequest) -> SearchState {
         let search = Search(
@@ -41,12 +25,6 @@ actor SearchStore {
         return state(of: search)
     }
 
-    // MARK: - Reading
-
-    /// Open searches whose origin lies within `radiusMeters` of the caller.
-    ///
-    /// This is the server side of the notification step: with no push
-    /// infrastructure, the device polls this and surfaces what it finds.
     func nearbySearches(
         to coordinate: Coordinate,
         radiusMeters: Double
@@ -77,15 +55,11 @@ actor SearchStore {
         return state(of: search)
     }
 
-    /// Every search, open or closed. Used by the debug endpoint during the
-    /// field test, when it helps to see what the server actually holds.
     func allSearches() -> [SearchState] {
         searches.values
             .sorted { $0.startedAt > $1.startedAt }
             .map { state(of: $0) }
     }
-
-    // MARK: - Participating
 
     @discardableResult
     func join(searchId: UUID, request: JoinRequest) -> SearchState? {
@@ -115,8 +89,6 @@ actor SearchStore {
         searches[searchId] = search
     }
 
-    // MARK: - Reporting
-
     func reportDetection(
         searchId: UUID,
         request: ReportDetectionRequest
@@ -134,8 +106,6 @@ actor SearchStore {
         )
         search.detections.append(detection)
 
-        // Reporting also counts as presence: someone who just detected the
-        // beacon is plainly still in the search.
         if var participant = search.participants[request.participantId] {
             participant.lastSeenAt = Date()
             search.participants[request.participantId] = participant
@@ -151,9 +121,6 @@ actor SearchStore {
               search.ownerId == request.ownerId
         else { return nil }
 
-        // Drop points that barely moved: the trail is meant to show which
-        // ground has been covered, and a dense cluster of near-identical
-        // points only makes the map harder to read.
         if let last = search.ownerTrail.last,
            last.coordinate.distance(to: request.coordinate) < 10 {
             return state(of: search)
@@ -166,8 +133,6 @@ actor SearchStore {
         return state(of: search)
     }
 
-    // MARK: - Closing
-
     func closeSearch(searchId: UUID, request: CloseSearchRequest) -> SearchState? {
         guard var search = searches[searchId], search.ownerId == request.ownerId
         else { return nil }
@@ -176,8 +141,6 @@ actor SearchStore {
         searches[searchId] = search
         return state(of: search)
     }
-
-    // MARK: - Helpers
 
     private func activeParticipantCount(in search: Search) -> Int {
         let cutoff = Date().addingTimeInterval(-SearchStore.participantTimeout)
@@ -208,8 +171,6 @@ actor SearchStore {
         )
     }
 }
-
-// MARK: - Application storage
 
 extension Application {
     private struct SearchStoreKey: StorageKey {

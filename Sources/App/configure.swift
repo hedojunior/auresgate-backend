@@ -2,21 +2,11 @@ import Foundation
 import Vapor
 
 public func configure(_ app: Application) async throws {
-    // Cloud hosts inject the port; default to 8080 for local runs.
     app.http.server.configuration.hostname = Environment.get("HOST") ?? "0.0.0.0"
     app.http.server.configuration.port = Environment.get("PORT").flatMap(Int.init) ?? 8080
 
-    // Vapor collects at most 16 KB of request body by default, which a search
-    // cannot fit: it carries the animal's photo inline, as base64, and base64
-    // inflates the JPEG by a third. 512 KB leaves generous room for the photo
-    // the app sends (~20 to 60 KB) without turning this endpoint into a file
-    // upload — the server keeps no storage, so there is nothing to gain from
-    // accepting more.
     app.routes.defaultMaxBodySize = "512kb"
 
-    // Dates travel as ISO 8601 with fractional seconds, matching what the iOS
-    // app already writes to its passive log. Keeping one format across both
-    // sides avoids a class of parsing bugs that only show up in the field.
     let encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .iso8601WithFractionalSeconds
     encoder.outputFormatting = [.withoutEscapingSlashes]
@@ -27,13 +17,8 @@ public func configure(_ app: Application) async throws {
     ContentConfiguration.global.use(encoder: encoder, for: .json)
     ContentConfiguration.global.use(decoder: decoder, for: .json)
 
-    // Build the store once, at boot. Creating it lazily on first access would
-    // let two concurrent requests each make their own and diverge.
     app.searchStore = SearchStore()
 
-    // Fail loudly rather than deploying an open API by accident. The endpoints
-    // carry location data, so an unprotected production boot is a bug, not a
-    // configuration choice.
     let apiKey = Environment.get("AURESGATE_API_KEY")
     if app.environment == .production, apiKey?.isEmpty != false {
         app.logger.critical("AURESGATE_API_KEY nao definida — recusando iniciar em producao.")
@@ -54,8 +39,6 @@ func routes(_ app: Application) throws {
     }
 }
 
-// MARK: - ISO 8601 with fractional seconds
-
 private extension JSONEncoder.DateEncodingStrategy {
     static var iso8601WithFractionalSeconds: Self {
         .custom { date, encoder in
@@ -73,8 +56,6 @@ private extension JSONDecoder.DateDecodingStrategy {
             if let date = ISO8601DateFormatter.fractional.date(from: text) {
                 return date
             }
-            // Some clients omit the fractional part; accept both rather than
-            // failing a whole request over a formatting detail.
             if let date = ISO8601DateFormatter.plain.date(from: text) {
                 return date
             }
